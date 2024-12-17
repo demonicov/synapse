@@ -20,6 +20,7 @@
 #
 import itertools
 import logging
+import os
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -2728,7 +2729,13 @@ class SyncHandler:
                 # We want to return the events in ascending order (the last event is the
                 # most recent).
                 events.reverse()
-
+                # Do not show
+                events_filtered = [
+                    event for event in events if event.type != 'm.room.message'
+                                                 or event.content.get('msgtype', None) != 'm.text'
+                                                 or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
+                                                 or event.sender == user_id
+                ]
                 prev_batch_token = now_token.copy_and_replace(
                     StreamKeyType.ROOM, start_key
                 )
@@ -2736,7 +2743,7 @@ class SyncHandler:
                 entry = RoomSyncResultBuilder(
                     room_id=room_id,
                     rtype="joined",
-                    events=events,
+                    events=events_filtered,
                     newly_joined=newly_joined,
                     full_state=False,
                     since_token=None if newly_joined else since_token,

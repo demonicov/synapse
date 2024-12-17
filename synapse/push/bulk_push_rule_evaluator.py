@@ -20,6 +20,7 @@
 #
 
 import logging
+import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -363,6 +364,11 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
+        # ignore pushing notifications when room message contains unsigned -> SYNAPSE_EVENT_UNSIGNED_KEY
+        if (event.type == 'm.room.message' and event.content.get('msgtype', None) == 'm.text'
+                and event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')):
+            return
+
         if (
             not event.internal_metadata.is_notifiable()
             or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
