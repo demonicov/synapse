@@ -24,8 +24,10 @@ import logging
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
+import os
 from unpaddedbase64 import decode_base64, encode_base64
 
+from synapse import overra
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
@@ -408,9 +410,11 @@ class SearchHandler:
             for e in search_result.allowed_events
         ]
 
+        results = overra.filter_search_events(results)
+
         rooms_cat_res: JsonDict = {
             "results": results,
-            "count": search_result.count,
+            "count": len(results),
             "highlights": list(search_result.highlights),
         }
 

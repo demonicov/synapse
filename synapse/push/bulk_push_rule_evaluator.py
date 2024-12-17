@@ -20,6 +20,7 @@
 #
 
 import logging
+import os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -38,6 +39,7 @@ from prometheus_client import Counter
 
 from twisted.internet.defer import Deferred
 
+from synapse import overra
 from synapse.api.constants import (
     MAIN_TIMELINE,
     EventContentFields,
@@ -363,6 +365,11 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
+        # ignore pushing notifications when room message contains unsigned
+        # todo: Why user_id is not passed?
+        if not overra.is_visible(event):
+            return
+
         if (
             not event.internal_metadata.is_notifiable()
             or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync

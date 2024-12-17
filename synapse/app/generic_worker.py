@@ -26,6 +26,7 @@ from typing import Dict, List
 from twisted.web.resource import Resource
 
 import synapse
+import synapse.overra as overra
 import synapse.events
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
@@ -356,6 +357,9 @@ def start(config_options: List[str]) -> None:
     # redirect stdio to the logs, if configured.
     if not hs.config.logging.no_redirect_stdio:
         redirect_stdio_to_logs()
+
+    # set HS in overra
+    overra.HS = hs
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

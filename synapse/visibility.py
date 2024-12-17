@@ -34,6 +34,7 @@ from typing import (
 )
 
 import attr
+import os
 
 from synapse.api.constants import (
     EventTypes,
@@ -41,6 +42,7 @@ from synapse.api.constants import (
     HistoryVisibility,
     Membership,
 )
+from synapse import overra
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import clone_event, prune_event
@@ -189,7 +191,6 @@ async def filter_events_for_client(
 
     # Turn it into a list and remove None entries before returning.
     return [ev for ev in filtered_events if ev]
-
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
@@ -353,6 +354,8 @@ def _check_client_allowed_to_see_event(
 
         the original event if they can see it as normal.
     """
+    if not overra.is_visible(event, user_id):
+        return None
     # Only run some checks if these events aren't about to be sent to clients. This is
     # because, if this is not the case, we're probably only checking if the users can
     # see events in the room at that point in the DAG, and that shouldn't be decided

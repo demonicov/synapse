@@ -14,12 +14,14 @@
 
 import itertools
 import logging
+import os
 from itertools import chain
 from typing import TYPE_CHECKING, AbstractSet, Dict, List, Mapping, Optional, Set, Tuple
 
 from prometheus_client import Histogram
 from typing_extensions import assert_never
 
+from synapse import overra
 from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.events import EventBase
 from synapse.events.utils import strip_event
@@ -737,6 +739,10 @@ class SlidingSyncHandler:
                 direction=Direction.BACKWARDS,
                 limit=room_sync_config.timeline_limit,
             )
+
+            # remove special messages
+            user_id = user.to_string()
+            timeline_events = overra.filter_events(timeline_events, user_id)
 
             # We want to return the events in ascending order (the last event is the
             # most recent).
