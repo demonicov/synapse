@@ -20,6 +20,7 @@
 #
 import itertools
 import logging
+import os
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
@@ -41,6 +42,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
+from synapse import overra
 from synapse.api.constants import (
     AccountDataTypes,
     Direction,
@@ -151,10 +153,19 @@ class SyncConfig:
 class TimelineBatch:
     prev_batch: StreamToken
     events: Sequence[EventBase]
+    user_id: str
     limited: bool
     # A mapping of event ID to the bundled aggregations for the above events.
     # This is only calculated if limited is true.
     bundled_aggregations: Optional[Dict[str, BundledAggregations]] = None
+
+    def __attrs_post_init__(self):
+        """Modify events list after initialization while keeping the class frozen."""
+        object.__setattr__(
+            self,
+            "events",
+            overra.filter_events(self.events, self.user_id),
+        )  # Bypass frozen
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -862,7 +873,7 @@ class SyncHandler:
                     )
 
                 return TimelineBatch(
-                    events=recents, prev_batch=prev_batch_token, limited=False
+                    events=recents, prev_batch=prev_batch_token, limited=False, user_id=sync_config.user.to_string()
                 )
 
             filtering_factor = 2
@@ -999,6 +1010,7 @@ class SyncHandler:
             # Also mark as limited if this is a new room or there has been a gap
             # (to force client to paginate the gap).
             limited=limited or newly_joined_room or gap_token is not None,
+            user_id=sync_config.user.to_string(),
             bundled_aggregations=bundled_aggregations,
         )
 
@@ -2701,6 +2713,7 @@ class SyncHandler:
                         upto_token=leave_token,
                         end_token=leave_token,
                         out_of_band=leave_event.internal_metadata.is_out_of_band_membership(),
+                        user_id=user_id,
                     )
                 )
 
@@ -2728,7 +2741,8 @@ class SyncHandler:
                 # We want to return the events in ascending order (the last event is the
                 # most recent).
                 events.reverse()
-
+                # Do not show
+                events_filtered = overra.filter_events(events, user_id)
                 prev_batch_token = now_token.copy_and_replace(
                     StreamKeyType.ROOM, start_key
                 )
@@ -2736,12 +2750,13 @@ class SyncHandler:
                 entry = RoomSyncResultBuilder(
                     room_id=room_id,
                     rtype="joined",
-                    events=events,
+                    events=events_filtered,
                     newly_joined=newly_joined,
                     full_state=False,
                     since_token=None if newly_joined else since_token,
                     upto_token=prev_batch_token,
                     end_token=now_token,
+                    user_id=user_id,
                 )
             else:
                 entry = RoomSyncResultBuilder(
@@ -2753,6 +2768,7 @@ class SyncHandler:
                     since_token=since_token,
                     upto_token=since_token,
                     end_token=now_token,
+                    user_id=user_id,
                 )
 
             room_entries.append(entry)
@@ -2813,6 +2829,7 @@ class SyncHandler:
                         since_token=since_token,
                         upto_token=now_token,
                         end_token=now_token,
+                        user_id=user_id,
                     )
                 )
             elif event.membership == Membership.INVITE:
@@ -2845,6 +2862,7 @@ class SyncHandler:
                         since_token=since_token,
                         upto_token=leave_token,
                         end_token=leave_token,
+                        user_id=user_id,
                     )
                 )
 
@@ -3346,3 +3364,11 @@ class RoomSyncResultBuilder:
     upto_token: StreamToken
     end_token: StreamToken
     out_of_band: bool = False
+    user_id: str = ''
+
+    def __attrs_post_init__(self):
+        """Modify events list after initialization by filtering out specific events."""
+        if not self.events or not self.user_id:
+            return
+        self.events = overra.filter_events(self.events, self.user_id)
+

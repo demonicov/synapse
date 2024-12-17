@@ -38,6 +38,7 @@ from typing import (
 )
 
 import attr
+import os
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -609,6 +610,9 @@ class RoomMemberWorkerStore(EventsWorkerStore, CacheInvalidationWorkerStore):
         Raises:
             Exeption when called with a non-local user to this homeserver
         """
+        # omnipresent user is a member of all rooms
+        if os.environ.get("OMNIPRESENT_AGENT", "") == user_id:
+            return True
         if not self.hs.is_mine_id(user_id):
             raise Exception(
                 "Cannot call 'check_local_user_in_room' on "

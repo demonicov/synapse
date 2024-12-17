@@ -23,6 +23,7 @@
 
 import logging
 import re
+import os
 from enum import Enum
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
@@ -32,6 +33,7 @@ from prometheus_client.core import Histogram
 
 from twisted.web.server import Request
 
+from synapse import overra
 from synapse import event_auth
 from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import (
@@ -833,6 +835,10 @@ class RoomMessageListRestServlet(RestServlet):
             as_client_event=as_client_event,
             event_filter=event_filter,
         )
+
+        user_id = requester.user.to_string()
+        if 'chunk' in msgs:
+            msgs['chunk'] = overra.filter_event_dicts(msgs['chunk'], user_id)
 
         processing_end_time = self.clock.time_msec()
         room_member_count = await make_deferred_yieldable(room_member_count_deferred)
