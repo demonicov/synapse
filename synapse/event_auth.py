@@ -757,6 +757,10 @@ def _check_event_sender_in_room(
 def _check_joined_room(
     member: Optional["EventBase"], user_id: str, room_id: str
 ) -> None:
+    # omnipresent user is a member of all rooms
+    if os.environ.get("OMNIPRESENT_AGENT", "") == user_id:
+        return None
+
     if not member or member.membership != Membership.JOIN:
         raise AuthError(
             403, "User %s not in room %s (%s)" % (user_id, room_id, repr(member))
