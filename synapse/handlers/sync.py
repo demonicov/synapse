@@ -2702,6 +2702,7 @@ class SyncHandler:
                         upto_token=leave_token,
                         end_token=leave_token,
                         out_of_band=leave_event.internal_metadata.is_out_of_band_membership(),
+                        user_id=user_id,
                     )
                 )
 
@@ -2732,7 +2733,6 @@ class SyncHandler:
                 # Do not show
                 events_filtered = [
                     event for event in events if event.type != 'm.room.message'
-                                                 or event.content.get('msgtype', None) != 'm.text'
                                                  or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
                                                  or event.sender == user_id
                 ]
@@ -2749,6 +2749,7 @@ class SyncHandler:
                     since_token=None if newly_joined else since_token,
                     upto_token=prev_batch_token,
                     end_token=now_token,
+                    user_id=user_id,
                 )
             else:
                 entry = RoomSyncResultBuilder(
@@ -2760,6 +2761,7 @@ class SyncHandler:
                     since_token=since_token,
                     upto_token=since_token,
                     end_token=now_token,
+                    user_id=user_id,
                 )
 
             room_entries.append(entry)
@@ -2820,6 +2822,7 @@ class SyncHandler:
                         since_token=since_token,
                         upto_token=now_token,
                         end_token=now_token,
+                        user_id=user_id,
                     )
                 )
             elif event.membership == Membership.INVITE:
@@ -2852,6 +2855,7 @@ class SyncHandler:
                         since_token=since_token,
                         upto_token=leave_token,
                         end_token=leave_token,
+                        user_id=user_id,
                     )
                 )
 
@@ -3353,3 +3357,15 @@ class RoomSyncResultBuilder:
     upto_token: StreamToken
     end_token: StreamToken
     out_of_band: bool = False
+    user_id: str = ''
+
+    def __attrs_post_init__(self):
+        """Modify events list after initialization by filtering out specific events."""
+        if not self.events or not self.user_id:
+            return
+        self.events = [
+            event for event in self.events if event.type != 'm.room.message'
+                                         or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
+                                         or event.sender == self.user_id
+        ]
+

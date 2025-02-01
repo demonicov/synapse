@@ -743,7 +743,6 @@ class SlidingSyncHandler:
             user_id = user.to_string()
             timeline_events = [
                 event for event in timeline_events if event.type != 'm.room.message'
-                                                      or event.content.get('msgtype', None) != 'm.text'
                                                       or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
                                                       or event.sender == user_id
             ]
