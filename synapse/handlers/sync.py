@@ -152,10 +152,22 @@ class SyncConfig:
 class TimelineBatch:
     prev_batch: StreamToken
     events: Sequence[EventBase]
+    user_id: str
     limited: bool
     # A mapping of event ID to the bundled aggregations for the above events.
     # This is only calculated if limited is true.
     bundled_aggregations: Optional[Dict[str, BundledAggregations]] = None
+
+    def __attrs_post_init__(self):
+        """Modify events list after initialization while keeping the class frozen."""
+        object.__setattr__(
+            self,
+            "events",
+            [
+                event for event in self.events if
+                event.type != "m.room.message" or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ""), "") or event.sender == self.user_id
+            ]
+        )  # Bypass frozen
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -863,7 +875,7 @@ class SyncHandler:
                     )
 
                 return TimelineBatch(
-                    events=recents, prev_batch=prev_batch_token, limited=False
+                    events=recents, prev_batch=prev_batch_token, limited=False, user_id=sync_config.user.to_string()
                 )
 
             filtering_factor = 2
@@ -1000,6 +1012,7 @@ class SyncHandler:
             # Also mark as limited if this is a new room or there has been a gap
             # (to force client to paginate the gap).
             limited=limited or newly_joined_room or gap_token is not None,
+            user_id=sync_config.user.to_string(),
             bundled_aggregations=bundled_aggregations,
         )
 
