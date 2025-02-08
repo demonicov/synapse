@@ -23,6 +23,7 @@
 
 import logging
 import re
+import os
 from enum import Enum
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
@@ -833,6 +834,15 @@ class RoomMessageListRestServlet(RestServlet):
             as_client_event=as_client_event,
             event_filter=event_filter,
         )
+
+        user_id = requester.user.to_string()
+        if 'chunk' in msgs:
+            msgs['chunk'] = [
+                event for event in msgs['chunk']
+                if event['type'] != 'm.room.message'
+                   or not event['unsigned'].get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
+                   or event['sender'] == user_id
+            ]
 
         processing_end_time = self.clock.time_msec()
         room_member_count = await make_deferred_yieldable(room_member_count_deferred)
