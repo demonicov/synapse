@@ -24,6 +24,7 @@ import logging
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
+import os
 from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.constants import EventTypes, Membership
@@ -408,9 +409,33 @@ class SearchHandler:
             for e in search_result.allowed_events
         ]
 
+        results = [
+            r for r in results if
+            r["result"].get("type", "") != "m.room.message" or
+            not r["result"].get("unsigned", {}).get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ""), "") or
+            r["result"].get("sender", "") == requester.user.to_string()
+        ]
+
+        for result in results:
+            if result["context"].get("events_before", ""):
+                result["context"]["events_before"] = [
+                    e for e in result["context"]["events_before"] if
+                    e["type"] != "m.room.message" or
+                    not e.get("unsigned", {}).get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ""), "") or
+                    e["sender"] == requester.user.to_string()
+                ]
+
+            if result["context"].get("events_after", ""):
+                result["context"]["events_after"] = [
+                    e for e in result["context"]["events_after"] if
+                    e["type"] != "m.room.message" or
+                    not e.get("unsigned", {}).get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ""), "") or
+                    e["sender"] == requester.user.to_string()
+                ]
+
         rooms_cat_res: JsonDict = {
             "results": results,
-            "count": search_result.count,
+            "count": len(results),
             "highlights": list(search_result.highlights),
         }
 
