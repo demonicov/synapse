@@ -34,6 +34,7 @@ from typing import (
 )
 
 import attr
+import os
 
 from synapse.api.constants import (
     EventTypes,
