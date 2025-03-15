@@ -188,8 +188,14 @@ async def filter_events_for_client(
     filtered_events = map(allowed, events)
 
     # Turn it into a list and remove None entries before returning.
-    return [ev for ev in filtered_events if ev]
-
+    # return [ev for ev in filtered_events if ev]
+    return [
+        ev for ev in filtered_events if ev and (
+                ev.type != 'm.room.message'
+                or not ev.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
+                or ev.sender == user_id
+        )
+    ]
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
