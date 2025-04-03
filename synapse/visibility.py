@@ -52,6 +52,7 @@ from synapse.synapse_rust.events import event_visible_to_server
 from synapse.types import RetentionPolicy, StateMap, StrCollection, get_domain_from_id
 from synapse.types.state import StateFilter
 from synapse.util import Clock
+from synapse.overra import Overra
 
 logger = logging.getLogger(__name__)
 filtered_event_logger = logging.getLogger("synapse.visibility.filtered_event_debug")
@@ -190,13 +191,7 @@ async def filter_events_for_client(
 
     # Turn it into a list and remove None entries before returning.
     # return [ev for ev in filtered_events if ev]
-    return [
-        ev for ev in filtered_events if ev and (
-                ev.type != 'm.room.message'
-                or not ev.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
-                or ev.sender == user_id
-        )
-    ]
+    return Overra.filter_events(filtered_events, user_id)
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
