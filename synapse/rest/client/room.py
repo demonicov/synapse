@@ -33,6 +33,7 @@ from prometheus_client.core import Histogram
 
 from twisted.web.server import Request
 
+from synapse import overra
 from synapse import event_auth
 from synapse.api.constants import Direction, EventTypes, Membership
 from synapse.api.errors import (
@@ -837,12 +838,7 @@ class RoomMessageListRestServlet(RestServlet):
 
         user_id = requester.user.to_string()
         if 'chunk' in msgs:
-            msgs['chunk'] = [
-                event for event in msgs['chunk']
-                if event['type'] != 'm.room.message'
-                   or not event['unsigned'].get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
-                   or event['sender'] == user_id
-            ]
+            msgs['chunk'] = overra.filter_event_dicts(msgs['chunk'], user_id)
 
         processing_end_time = self.clock.time_msec()
         room_member_count = await make_deferred_yieldable(room_member_count_deferred)

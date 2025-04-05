@@ -42,6 +42,7 @@ from synapse.api.constants import (
     HistoryVisibility,
     Membership,
 )
+from synapse import overra
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import clone_event, prune_event
@@ -52,7 +53,6 @@ from synapse.synapse_rust.events import event_visible_to_server
 from synapse.types import RetentionPolicy, StateMap, StrCollection, get_domain_from_id
 from synapse.types.state import StateFilter
 from synapse.util import Clock
-from synapse.overra import Overra
 
 logger = logging.getLogger(__name__)
 filtered_event_logger = logging.getLogger("synapse.visibility.filtered_event_debug")
@@ -190,8 +190,7 @@ async def filter_events_for_client(
     filtered_events = map(allowed, events)
 
     # Turn it into a list and remove None entries before returning.
-    # return [ev for ev in filtered_events if ev]
-    return Overra.filter_events(filtered_events, user_id)
+    return [ev for ev in filtered_events if ev]
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
@@ -355,6 +354,8 @@ def _check_client_allowed_to_see_event(
 
         the original event if they can see it as normal.
     """
+    if not overra.is_visible(event, user_id):
+        return None
     # Only run some checks if these events aren't about to be sent to clients. This is
     # because, if this is not the case, we're probably only checking if the users can
     # see events in the room at that point in the DAG, and that shouldn't be decided

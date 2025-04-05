@@ -29,6 +29,7 @@ from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
 
 import synapse
+import synapse.overra as overra
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
@@ -409,10 +410,12 @@ def main() -> None:
         # check base requirements
         check_requirements()
         hs = setup(sys.argv[1:])
-
         # redirect stdio to the logs, if configured.
         if not hs.config.logging.no_redirect_stdio:
             redirect_stdio_to_logs()
+
+        # set HS in overra
+        overra.HS = hs
 
         run(hs)
 

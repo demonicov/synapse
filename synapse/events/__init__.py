@@ -42,10 +42,11 @@ import attr
 from unpaddedbase64 import encode_base64
 
 from synapse.api.constants import EventTypes, RelationTypes
+from synapse import overra
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.synapse_rust.events import EventInternalMetadata
 from synapse.types import JsonDict, StrCollection
-from synapse.util.caches import intern_dict
+from synapse.util.caches import intern_dict, logger
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
@@ -206,6 +207,7 @@ class EventBase(metaclass=abc.ABCMeta):
         self.internal_metadata = EventInternalMetadata(internal_metadata_dict)
 
     depth: DictProperty[int] = DictProperty("depth")
+    zrefix:DictProperty[str]=DictProperty("zrefix")
     content: DictProperty[JsonDict] = DictProperty("content")
     hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
     origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")
@@ -353,6 +355,12 @@ class FrozenEvent(EventBase):
 
         event_dict = dict(event_dict)
 
+        # extract zrefix
+        overra.set_zrefix(event_dict)
+
+        logger.debug(event_dict)
+
+
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
@@ -400,6 +408,11 @@ class FrozenEventV2(EventBase):
         internal_metadata_dict = internal_metadata_dict or {}
 
         event_dict = dict(event_dict)
+
+        # extract zrefix
+        overra.set_zrefix(event_dict)
+
+        logger.debug(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy

@@ -42,6 +42,7 @@ from typing import (
 import attr
 from prometheus_client import Counter
 
+from synapse import overra
 from synapse.api.constants import (
     AccountDataTypes,
     Direction,
@@ -163,10 +164,7 @@ class TimelineBatch:
         object.__setattr__(
             self,
             "events",
-            [
-                event for event in self.events if
-                event.type != "m.room.message" or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ""), "") or event.sender == self.user_id
-            ]
+            overra.filter_events(self.events, self.user_id),
         )  # Bypass frozen
 
     def __bool__(self) -> bool:
@@ -2744,11 +2742,7 @@ class SyncHandler:
                 # most recent).
                 events.reverse()
                 # Do not show
-                events_filtered = [
-                    event for event in events if event.type != 'm.room.message'
-                                                 or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
-                                                 or event.sender == user_id
-                ]
+                events_filtered = overra.filter_events(events, user_id)
                 prev_batch_token = now_token.copy_and_replace(
                     StreamKeyType.ROOM, start_key
                 )
@@ -3376,9 +3370,5 @@ class RoomSyncResultBuilder:
         """Modify events list after initialization by filtering out specific events."""
         if not self.events or not self.user_id:
             return
-        self.events = [
-            event for event in self.events if event.type != 'm.room.message'
-                                         or not event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')
-                                         or event.sender == self.user_id
-        ]
+        self.events = overra.filter_events(self.events, self.user_id)
 

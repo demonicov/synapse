@@ -39,6 +39,7 @@ from prometheus_client import Counter
 
 from twisted.internet.defer import Deferred
 
+from synapse import overra
 from synapse.api.constants import (
     MAIN_TIMELINE,
     EventContentFields,
@@ -364,9 +365,9 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-        # ignore pushing notifications when room message contains unsigned -> SYNAPSE_EVENT_UNSIGNED_KEY
-        if (event.type == 'm.room.message' and event.content.get('msgtype', None) == 'm.text'
-                and event.unsigned.get(os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", ''), '')):
+        # ignore pushing notifications when room message contains unsigned
+        # todo: Why user_id is not passed?
+        if not overra.is_visible(event):
             return
 
         if (
