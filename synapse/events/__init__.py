@@ -358,9 +358,6 @@ class FrozenEvent(EventBase):
         # extract zrefix
         overra.set_zrefix(event_dict)
 
-        logger.debug(event_dict)
-
-
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy
         signatures = {
@@ -411,8 +408,6 @@ class FrozenEventV2(EventBase):
 
         # extract zrefix
         overra.set_zrefix(event_dict)
-
-        logger.debug(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
         # copy.deepcopy

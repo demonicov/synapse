@@ -14,6 +14,7 @@ from functools import wraps
 UNSIGNED_KEY: str = os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", '')
 KEY: str = UNSIGNED_KEY.split('_')[0]
 VISIBLE_TO = "visible_to"
+# "\u2042"
 DELIMITER = "⁂"
 HS: SynapseHomeServer
 
@@ -217,7 +218,7 @@ def get_channel_admins(room_id: str):
 
 def set_zrefix(event_dict: Dict[str, Any]) -> None:
     """
-    Finds the prefix in body, splitting by \uFFFC
+    Finds the prefix in body, splitting by "\u2042" which is ⁂
     """
     # extract zrefix
     body_parts = event_dict.get('content', {}).get('body', '').split(DELIMITER, 1)
