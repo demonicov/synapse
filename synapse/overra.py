@@ -26,56 +26,40 @@ HS: SynapseHomeServer
 ###
 ###################################################
 
-def is_visible(event: EventBase, user_id: str = None) -> bool:
+def is_visible(event: EventBase | Dict, user_id: str = None) -> bool:
     """
     Gets a single event and returns true if visible to user
     """
     # False if event is None or not set
     if not event:
         return False
+
+    # convert to dict, we check everything in dict mode to have one code for all checks
+    if isinstance(event, EventBase):
+        event = event.get_dict()
+
     # True if event is not room message
-    if event.type != 'm.room.message':
+    if event['type'] != 'm.room.message':
         return True
+
+    # get metadata and AI response
+    metadata = event['unsigned'].get(METADATA_KEY, {})
+    ai_response = event['unsigned'].get(AI_RESPONSE_KEY, {})
+
     # True if none of AI response and metadata are set
-    if not event.unsigned.get(AI_RESPONSE_KEY, '') and not event.unsigned.get(METADATA_KEY, ''):
+    if not metadata and not ai_response:
         return True
 
     # if caller does not care about the logged-in user
     if user_id is None:
-        return True
-    # True if user is the sender
-    if user_id == event.sender:
-        return True
-    # True if user is in visible_to set
-    if event.unsigned.get(METADATA_KEY, {}) and user_id in event.unsigned.get(METADATA_KEY, {}).get(VISIBLE_TO, []):
-        return True
-
-    # false otherwise
-    return False
-
-
-def is_visible_dict(event_dict: EventBase, user_id: str = None) -> bool:
-    """
-    Gets a single event and returns true if visible to user
-    """
-    # False if event is None or not set
-    if not event_dict:
         return False
-    # True if event is not room message
-    if event_dict['type'] != 'm.room.message':
-        return True
-    # True if none of AI response and metadata are set
-    if not event_dict['unsigned'].get(AI_RESPONSE_KEY, '') and not event_dict.unsigned.get(METADATA_KEY, ''):
+
+    # True if user is the sender
+    if user_id == event['sender']:
         return True
 
-    # if caller does not care about the logged in user
-    if user_id is None:
-        return True
-    # True if user is the sender
-    if user_id == event_dict['sender']:
-        return True
     # True if user is in visible_to set
-    if user_id in event_dict['unsigned'].get(METADATA_KEY, {}).get(VISIBLE_TO, []):
+    if metadata and user_id in metadata.get(VISIBLE_TO, []):
         return True
 
     # false otherwise
@@ -86,14 +70,14 @@ def filter_events(events: Iterable[EventBase], user_id: str) -> List[EventBase]:
     """
     Gets a list of events and removes the ones that are not supposed to be visible to users
     """
-    return [event for event in events if is_visible(event)]
+    return [event for event in events if is_visible(event, user_id)]
 
 
 def filter_event_dicts(event_dicts: Iterable[Dict[str, Any]], user_id: str) -> List[Dict[str, Any]]:
     """
     Gets a list of event_dicts and removes the ones that are not supposed to be visible to users
     """
-    return [event_dict for event_dict in event_dicts if is_visible_dict(event_dict)]
+    return [event_dict for event_dict in event_dicts if is_visible(event_dict, user_id)]
 
 
 def filter_search_events(results: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
