@@ -124,7 +124,6 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
     """
     # extract zrefix
     try:
-
         parts = event_dict.get('content', {}).get('body', '').split(ZREFIX_DELIMITER, 1)
 
         if len(parts) == 2:
@@ -136,7 +135,7 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
 
         if len(parts) == 2:
             event_dict['zrefix'] = parts[0].strip()
-            event_dict['content']['formatted_body'] = event_dict['content']['formatted_body'].replace(
+            event_dict['content']['formatted_body'] = '' if not parts[1].strip() else event_dict['content']['formatted_body'].replace(
                 event_dict['zrefix'] + ZREFIX_DELIMITER,
                 ''
             ).strip()
