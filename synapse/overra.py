@@ -11,53 +11,89 @@ import time
 from typing import Any, Dict, Iterable, List, cast
 from functools import wraps
 
-UNSIGNED_KEY: str = os.environ.get("SYNAPSE_EVENT_UNSIGNED_KEY", '')
-KEY: str = UNSIGNED_KEY.split('_')[0]
+KEY: str = os.environ.get("SYNAPSE_SPECIAL_KEY", 'NOT_SET')
+AI_RESPONSE_KEY: str = os.environ.get("SYNAPSE_SPECIAL_KEY", '') + '_ai_response'
+METADATA_KEY: str = os.environ.get("SYNAPSE_SPECIAL_KEY", '') + '_metadata'
 VISIBLE_TO = "visible_to"
 # "\u2042"
 DELIMITER = "⁂"
 HS: SynapseHomeServer
 
 
-def print_caller():
+###################################################
+###
+### Filter Section
+###
+###################################################
+
+def is_visible(event: EventBase, user_id: str = None) -> bool:
     """
-    Shows which function is calling the method of this file
-    WARNING: This method makes everything super-slow
+    Gets a single event and returns true if visible to user
     """
-    stack = inspect.stack()
-    frame1 = stack[1]  # Get the caller at the given stack level
-    frame2 = stack[2]  # Get the caller at the given stack level
-    logging.warning(f"{frame1.function} called from {frame2.function} ({frame2.filename}:{frame2.lineno})")
+    # False if event is None or not set
+    if not event:
+        return False
+    # True if event is not room message
+    if event.type != 'm.room.message':
+        return True
+    # True if none of AI response and metadata are set
+    if not event.unsigned.get(AI_RESPONSE_KEY, '') and not event.unsigned.get(METADATA_KEY, ''):
+        return True
+
+    # if caller does not care about the logged-in user
+    if user_id is None:
+        return True
+    # True if user is the sender
+    if user_id == event.sender:
+        return True
+    # True if user is in visible_to set
+    if user_id in event.unsigned.get(METADATA_KEY, {}).get(VISIBLE_TO, []):
+        return True
+
+    # false otherwise
+    return False
+
+
+def is_visible_dict(event_dict: EventBase, user_id: str = None) -> bool:
+    """
+    Gets a single event and returns true if visible to user
+    """
+    # False if event is None or not set
+    if not event_dict:
+        return False
+    # True if event is not room message
+    if event_dict['type'] != 'm.room.message':
+        return True
+    # True if none of AI response and metadata are set
+    if not event_dict['unsigned'].get(AI_RESPONSE_KEY, '') and not event_dict.unsigned.get(METADATA_KEY, ''):
+        return True
+
+    # if caller does not care about the logged in user
+    if user_id is None:
+        return True
+    # True if user is the sender
+    if user_id == event_dict['sender']:
+        return True
+    # True if user is in visible_to set
+    if user_id in event_dict['unsigned'].get(METADATA_KEY, {}).get(VISIBLE_TO, []):
+        return True
+
+    # false otherwise
+    return False
 
 
 def filter_events(events: Iterable[EventBase], user_id: str) -> List[EventBase]:
     """
     Gets a list of events and removes the ones that are not supposed to be visible to users
     """
-    return [
-        event for event in events if event and (
-                event.type != 'm.room.message'
-                or not event.unsigned.get(UNSIGNED_KEY, '')
-                or event.sender == user_id
-                or user_id in get_channel_admins(event.room_id)
-                or (isinstance(event.unsigned[UNSIGNED_KEY], dict) and user_id in event.unsigned[UNSIGNED_KEY].get(VISIBLE_TO, []))
-        )
-    ]
+    return [event for event in events if is_visible(event)]
 
 
 def filter_event_dicts(event_dicts: Iterable[Dict[str, Any]], user_id: str) -> List[Dict[str, Any]]:
     """
     Gets a list of event_dicts and removes the ones that are not supposed to be visible to users
     """
-    return [
-        event_dict for event_dict in event_dicts if event_dict and (
-                event_dict['type'] != 'm.room.message'
-                or not event_dict['unsigned'].get(UNSIGNED_KEY, '')
-                or event_dict['sender'] == user_id
-                or user_id in event_dict['unsigned'][UNSIGNED_KEY].get(VISIBLE_TO, [])
-                or user_id in get_channel_admins(event_dict['room_id'])
-        )
-    ]
+    return [event_dict for event_dict in event_dicts if is_visible_dict(event_dict)]
 
 
 def filter_search_events(results: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -69,7 +105,7 @@ def filter_search_events(results: Iterable[Dict[str, Any]]) -> List[Dict[str, An
     results = [
         r for r in results if
         r["result"].get("type", "") != "m.room.message"
-        or not r["result"].get("unsigned", {}).get(UNSIGNED_KEY, "")
+        or not r["result"].get("unsigned", {}).get(AI_RESPONSE_KEY, "")
         or r["result"].get("sender", "") == requester.user.to_string()
     ]
 
@@ -78,7 +114,7 @@ def filter_search_events(results: Iterable[Dict[str, Any]]) -> List[Dict[str, An
             result["context"]["events_before"] = [
                 e for e in result["context"]["events_before"] if
                 e["type"] != "m.room.message"
-                or not e.get("unsigned", {}).get(UNSIGNED_KEY, "")
+                or not e.get("unsigned", {}).get(AI_RESPONSE_KEY, "")
                 or e["sender"] == requester.user.to_string()
             ]
 
@@ -86,42 +122,32 @@ def filter_search_events(results: Iterable[Dict[str, Any]]) -> List[Dict[str, An
             result["context"]["events_after"] = [
                 e for e in result["context"]["events_after"] if
                 e["type"] != "m.room.message"
-                or not e.get("unsigned", {}).get(UNSIGNED_KEY, "")
+                or not e.get("unsigned", {}).get(AI_RESPONSE_KEY, "")
                 or e["sender"] == requester.user.to_string()
             ]
 
     return results
 
 
-def is_visible(event: EventBase, user_id: str = None) -> bool:
+def set_zrefix(event_dict: Dict[str, Any]) -> None:
     """
-    Gets a single event and returns true if visible to user
+    Finds the prefix in body, splitting by "\u2042" which is ⁂
     """
-    return event and (
-            event.type != 'm.room.message'
-            or not event.unsigned.get(UNSIGNED_KEY, '')
-            or event.sender == user_id
-            or user_id in get_channel_admins(event.room_id)
-            or (isinstance(event.unsigned[UNSIGNED_KEY], dict) and user_id in event.unsigned[UNSIGNED_KEY].get(VISIBLE_TO, []))
-    )
+    # extract zrefix
+    body_parts = event_dict.get('content', {}).get('body', '').split(DELIMITER, 1)
+
+    if len(body_parts) != 2:
+        return
+
+    event_dict['zrefix'] = body_parts[0].strip()
+    event_dict['content']['body'] = body_parts[1].strip()
 
 
-def set_room(room_id, value):
-    db_pool = HS.get_datastores().main.db_pool
-    db_conn = LoggingDatabaseConnection(
-        db_pool._db_pool.connect(),
-        db_pool.engine,
-        "overra",
-    )
-
-    cur = db_conn.cursor()
-    cur.execute(
-        "Update rooms set is_public = ? where room_id = ?",
-        (value, room_id,)
-    )
-
-    cur.close()
-
+###################################################
+###
+### DB Section
+###
+###################################################
 
 def is_room_channel(room_id):
     """
@@ -216,15 +242,18 @@ def get_channel_admins(room_id: str):
     return [user_id for user_id, role in data.items() if role == 100]
 
 
-def set_zrefix(event_dict: Dict[str, Any]) -> None:
-    """
-    Finds the prefix in body, splitting by "\u2042" which is ⁂
-    """
-    # extract zrefix
-    body_parts = event_dict.get('content', {}).get('body', '').split(DELIMITER, 1)
+###################################################
+###
+### Utils Section
+###
+###################################################
 
-    if len(body_parts) != 2:
-        return
-
-    event_dict['zrefix'] = body_parts[0]
-    event_dict['content']['body'] = body_parts[1]
+def print_caller():
+    """
+    Shows which function is calling the method of this file
+    WARNING: This method makes everything super-slow
+    """
+    stack = inspect.stack()
+    frame1 = stack[1]  # Get the caller at the given stack level
+    frame2 = stack[2]  # Get the caller at the given stack level
+    logging.warning(f"{frame1.function} called from {frame2.function} ({frame2.filename}:{frame2.lineno})")
