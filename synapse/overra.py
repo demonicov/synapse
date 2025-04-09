@@ -17,7 +17,7 @@ AI_RESPONSE_KEY: str = os.environ.get("SYNAPSE_SPECIAL_KEY", '') + '_ai_response
 METADATA_KEY: str = os.environ.get("SYNAPSE_SPECIAL_KEY", '') + '_metadata'
 VISIBLE_TO = "visible_to"
 # "\u2042"
-DELIMITER = "⁂"
+ZREFIX_DELIMITER = "⁂"
 HS: SynapseHomeServer
 
 
@@ -123,19 +123,26 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
     Finds the prefix in body, splitting by "\u2042" which is ⁂
     """
     # extract zrefix
-    parts = event_dict.get('content', {}).get('body', '').split(DELIMITER, 1)
+    try:
 
-    if len(parts) == 2:
-        event_dict['zrefix'] = parts[0].strip()
-        event_dict['content']['body'] = parts[1].strip()
-        return
+        parts = event_dict.get('content', {}).get('body', '').split(ZREFIX_DELIMITER, 1)
 
-    parts = strip_html_tags(event_dict.get('content', {}).get('formatted_body', '')).split(DELIMITER, 1)
+        if len(parts) == 2:
+            event_dict['zrefix'] = parts[0].strip()
+            event_dict['content']['body'] = parts[1].strip()
+            return
 
-    if len(parts) == 2:
-        event_dict['zrefix'] = parts[0].strip()
-        event_dict['content']['formatted_body'] = event_dict['content']['formatted_body'].replace(event_dict['zrefix'], '').strip()
-        return
+        parts = strip_html_tags(event_dict.get('content', {}).get('formatted_body', '')).split(ZREFIX_DELIMITER, 1)
+
+        if len(parts) == 2:
+            event_dict['zrefix'] = parts[0].strip()
+            event_dict['content']['formatted_body'] = event_dict['content']['formatted_body'].replace(
+                event_dict['zrefix'] + ZREFIX_DELIMITER,
+                ''
+            ).strip()
+            return
+    except Exception as e:
+        logging.warning(f"Ignored exception {type(e)} {event_dict}")
 
 
 ###################################################
