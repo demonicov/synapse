@@ -47,7 +47,7 @@ def is_visible(event: EventBase, user_id: str = None) -> bool:
     if user_id == event.sender:
         return True
     # True if user is in visible_to set
-    if user_id in event.unsigned.get(METADATA_KEY, {}).get(VISIBLE_TO, []):
+    if event.unsigned.get(METADATA_KEY, {}) and user_id in event.unsigned.get(METADATA_KEY, {}).get(VISIBLE_TO, []):
         return True
 
     # false otherwise
