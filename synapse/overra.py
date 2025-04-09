@@ -59,6 +59,10 @@ def is_visible(event: EventBase | Dict, user_id: str = None) -> bool:
     if user_id == event['sender']:
         return True
 
+    # True if user admin
+    if user_id in get_channel_admins(event['room_id']):
+        return True
+
     # True if user is in visible_to set
     if metadata and user_id in metadata.get(VISIBLE_TO, []):
         return True
