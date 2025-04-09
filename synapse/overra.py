@@ -2,6 +2,7 @@ import inspect
 import logging
 import json
 import os
+import re
 
 from synapse.events import EventBase
 from synapse.app.homeserver import SynapseHomeServer
@@ -118,13 +119,19 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
     Finds the prefix in body, splitting by "\u2042" which is ⁂
     """
     # extract zrefix
-    body_parts = event_dict.get('content', {}).get('body', '').split(DELIMITER, 1)
+    parts = event_dict.get('content', {}).get('body', '').split(DELIMITER, 1)
 
-    if len(body_parts) != 2:
+    if len(parts) == 2:
+        event_dict['zrefix'] = parts[0].strip()
+        event_dict['content']['body'] = parts[1].strip()
         return
 
-    event_dict['zrefix'] = body_parts[0].strip()
-    event_dict['content']['body'] = body_parts[1].strip()
+    parts = strip_html_tags(event_dict.get('content', {}).get('formatted_body', '')).split(DELIMITER, 1)
+
+    if len(parts) == 2:
+        event_dict['zrefix'] = parts[0].strip()
+        event_dict['content']['formatted_body'] = event_dict['content']['formatted_body'].replace(event_dict['zrefix'], '').strip()
+        return
 
 
 ###################################################
@@ -241,3 +248,12 @@ def print_caller():
     frame1 = stack[1]  # Get the caller at the given stack level
     frame2 = stack[2]  # Get the caller at the given stack level
     logging.warning(f"{frame1.function} called from {frame2.function} ({frame2.filename}:{frame2.lineno})")
+
+
+def strip_html_tags(text: str):
+    """
+    Removes html tags from string
+    """
+    if not text:
+        return ''
+    return re.sub(r'<.*?>', '', text).strip()
