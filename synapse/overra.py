@@ -182,7 +182,7 @@ def is_room_channel(room_id):
 
     cur.close()
 
-    return row and (row[0] == True)
+    return row and (row[0] == True or row[0] == 'true')
 
 
 def is_room_public(room_id):
