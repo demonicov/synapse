@@ -208,6 +208,13 @@ def is_room_public(room_id):
 
 
 def get_channel_admins(room_id: str):
+    if not is_room_public(room_id):
+        return []
+
+    if not is_room_channel(room_id):
+        return []
+
+
     db_pool = HS.get_datastores().main.db_pool
     db_conn = LoggingDatabaseConnection(
         db_pool._db_pool.connect(),
