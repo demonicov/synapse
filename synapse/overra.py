@@ -136,7 +136,7 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
         if len(parts) == 2:
             event_dict['zrefix'] = parts[0].strip()
             event_dict['content']['formatted_body'] = '' if not parts[1].strip() else event_dict['content']['formatted_body'].replace(
-                event_dict['zrefix'] + ZREFIX_DELIMITER,
+                parts[0] + ZREFIX_DELIMITER,
                 ''
             ).strip()
             return
