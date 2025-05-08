@@ -133,7 +133,12 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
 
         parts = strip_html_tags(event_dict.get('content', {}).get('formatted_body', '')).split(ZREFIX_DELIMITER, 1)
 
+
         if len(parts) == 2:
+            event_dict['unsigned'] = {
+                'hpm': parts
+            }
+
             event_dict['zrefix'] = parts[0].strip()
             event_dict['content']['formatted_body'] = '' if not parts[1].strip() else event_dict['content']['formatted_body'].replace(
                 parts[0] + ZREFIX_DELIMITER,
