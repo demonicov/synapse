@@ -211,8 +211,9 @@ def is_room_public(room_id):
 
 def get_channel_admins(room_id: str):
     from synapse.storage.database import LoggingDatabaseConnection
-    if not is_room_public(room_id):
-        return []
+    # todo: find out why new channels are not public
+    # if not is_room_public(room_id):
+    #     return []
 
     if not is_room_channel(room_id):
         return []
