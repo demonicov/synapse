@@ -3,8 +3,10 @@ import logging
 import json
 import os
 import re
-
 import time
+
+from cachetools import cached, TTLCache
+from pony.orm import Database, db_session
 from typing import Any, Dict, Iterable, List, cast
 from functools import wraps
 
@@ -149,21 +151,31 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
 ### DB Section
 ###
 ###################################################
+@cached(cache=TTLCache(maxsize=128, ttl=10))
+@db_session
+def fetch_from_room(query: str, room_id: str):
+    """
+    This is written to do fetch_from_room queries
+    Returns something like:
+    [
+        ['real_room_id', integer],
+        ['real_room_id', integer],
+    ]
+    """
+    if not hasattr(fetch_from_room, 'db'):
+        fetch_from_room.db = Database()
+        db_config = HS.config.database.databases[0].config['args']
+        fetch_from_room.db.bind(provider='postgres', user=db_config['user'], password=db_config['password'], host=db_config['host'], database=db_config['dbname'])
+
+    # query to get results
+    return fetch_from_room.db.execute(query, {'room_id': room_id}).fetchall()
+
 
 def is_room_channel(room_id):
     """
     Checks if a room is a channel
     """
-    from synapse.storage.database import LoggingDatabaseConnection
-    db_pool = HS.get_datastores().main.db_pool
-    db_conn = LoggingDatabaseConnection(
-        db_pool._db_pool.connect(),
-        db_pool.engine,
-        "overra",
-    )
-
-    cur = db_conn.cursor()
-    cur.execute(f"""
+    rows = fetch_from_room(f"""
         SELECT 
             (ej.json::jsonb)->'content'->'{KEY}_channel'
         FROM 
@@ -173,60 +185,31 @@ def is_room_channel(room_id):
         ON 
             cse.event_id = ej.event_id
         WHERE 
-            cse.room_id = ?
+            cse.room_id = $room_id
             AND cse.type = 'm.room.{KEY}.channel'
-        """, (room_id,))
+        """, room_id)
 
-    # for channels ('true',)
-    # otherwise None
-    row = cast(tuple[bool], cur.fetchone())
-
-    cur.close()
-
-    return row and (row[0] == True or row[0] == 'true')
+    return rows and (rows[0][0] == True or rows[0][0] == 'true')
 
 
 def is_room_public(room_id):
-    from synapse.storage.database import LoggingDatabaseConnection
-    db_pool = HS.get_datastores().main.db_pool
-    db_conn = LoggingDatabaseConnection(
-        db_pool._db_pool.connect(),
-        db_pool.engine,
-        "overra",
-    )
-
-    cur = db_conn.cursor()
-    cur.execute("""
+    rows = fetch_from_room("""
         SELECT 
             is_public
         FROM 
             rooms
         WHERE 
-            room_id = ?
-        """, (room_id,))
-    row = cur.fetchone()
+            room_id = $room_id
+        """, room_id)
 
-    return row and (row[0] == True)
+    return rows and (row[0][0] == True or rows[0][0] == 'true')
 
 
 def get_channel_admins(room_id: str):
-    from synapse.storage.database import LoggingDatabaseConnection
     # todo: find out why new channels are not public
     # if not is_room_public(room_id):
     #     return []
-
-    if not is_room_channel(room_id):
-        return []
-
-    db_pool = HS.get_datastores().main.db_pool
-    db_conn = LoggingDatabaseConnection(
-        db_pool._db_pool.connect(),
-        db_pool.engine,
-        "overra",
-    )
-
-    cur = db_conn.cursor()
-    cur.execute("""
+    rows = fetch_from_room("""
         SELECT 
             (ej.json::jsonb)->'content'->'users' AS users
         FROM 
@@ -236,20 +219,17 @@ def get_channel_admins(room_id: str):
         ON 
             cse.event_id = ej.event_id
         WHERE 
-            cse.room_id = ?
+            cse.room_id = $room_id
             AND cse.type = 'm.room.power_levels'
-        """, (room_id,))
-    row = cast(tuple[Dict[str, int]], cur.fetchone())
-
-    cur.close()
+        """, room_id)
 
     # if no admins are found - is that possible?
-    if not row:
+    if not rows:
         return []
 
     # only users with 100 permission should see the message
     # ({"@a00043:localhost": 100},)
-    data = json.loads(row[0])  # Convert string to dict
+    data = json.loads(rows[0][0])  # Convert string to dict
     return [user_id for user_id, role in data.items() if role == 100]
 
 
