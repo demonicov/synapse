@@ -19,6 +19,8 @@
 #
 #
 import logging
+import socket
+
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
 from twisted.internet.defer import CancelledError
@@ -426,14 +428,25 @@ class ThirdPartyEventRulesModuleApiCallbacks:
         if len(self._on_new_event_callbacks) == 0:
             return
 
-        event = await self.store.get_event(event_id)
+        event: EventBase = await self.store.get_event(event_id)
+
+
+        try:
+            hostname = socket.gethostname()
+            if event.unsigned['hostname'] != hostname:
+                logger.debug(f"Early on_new_event return on {hostname} event {event.unsigned['hostname']}")
+                return
+        except Exception as e:
+            logger.debug(e)
+
+        state_events = None
 
         # We *don't* want to wait for the full state here, because waiting for full
         # state will persist event, which in turn will call this method.
         # This would end up in a deadlock.
-        state_events = await self._storage_controllers.state.get_current_state(
-            event.room_id, await_full_state=False
-        )
+        # state_events = await self._storage_controllers.state.get_current_state(
+        #     event.room_id, await_full_state=False
+        # )
 
         for callback in self._on_new_event_callbacks:
             try:
