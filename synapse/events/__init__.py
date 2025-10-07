@@ -207,7 +207,6 @@ class EventBase(metaclass=abc.ABCMeta):
         self.internal_metadata = EventInternalMetadata(internal_metadata_dict)
 
     depth: DictProperty[int] = DictProperty("depth")
-    zrefix:DictProperty[str]=DictProperty("zrefix")
     content: DictProperty[JsonDict] = DictProperty("content")
     hashes: DictProperty[Dict[str, str]] = DictProperty("hashes")
     origin_server_ts: DictProperty[int] = DictProperty("origin_server_ts")

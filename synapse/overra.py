@@ -126,17 +126,22 @@ def set_zrefix(event_dict: Dict[str, Any]) -> None:
         parts = event_dict.get('content', {}).get('body', '').split(ZREFIX_DELIMITER, 1)
 
         if len(parts) == 2:
+            # todo: remove in the future
             event_dict['zrefix'] = parts[0].strip()
             event_dict['content']['body'] = parts[1].strip()
+            if event_dict['unsigned'] is None:
+                event_dict['unsigned'] = {}
+            event_dict['unsigned']['zrefix'] = parts[0].strip()
+            return
 
         parts = strip_html_tags(event_dict.get('content', {}).get('formatted_body', '')).split(ZREFIX_DELIMITER, 1)
 
         if len(parts) == 2:
-            event_dict['unsigned'] = {
-                'hpm': parts
-            }
-
+            # todo: remove in the future
             event_dict['zrefix'] = parts[0].strip()
+            if event_dict['unsigned'] is None:
+                event_dict['unsigned'] = {}
+            event_dict['unsigned']['zrefix'] = parts[0].strip()
             event_dict['content']['formatted_body'] = '' if not parts[1].strip() else event_dict['content']['formatted_body'].replace(
                 parts[0] + ZREFIX_DELIMITER,
                 ''
