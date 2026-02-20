@@ -365,11 +365,6 @@ class BulkPushRuleEvaluator:
         context: EventContext,
         event_id_to_event: Mapping[str, EventBase],
     ) -> None:
-        # ignore pushing notifications when room message contains unsigned
-        # todo: Why user_id is not passed?
-        if not overra.is_visible(event):
-            return
-
         if (
             not event.internal_metadata.is_notifiable()
             or event.room_id in self.hs.config.server.rooms_to_exclude_from_sync
@@ -478,6 +473,9 @@ class BulkPushRuleEvaluator:
 
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
+                continue
+
+            if not overra.is_visible(event, user_id=uid):
                 continue
 
             display_name = None
